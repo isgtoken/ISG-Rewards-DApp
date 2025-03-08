@@ -1188,8 +1188,6 @@
                 const totalRewards = await contract.methods.rewardPool().call();
                 document.getElementById("totalRewards").innerText = web3.utils.fromWei(totalRewards, "ether");
 
-                const interval = await contract.methods.rewardInterval().call();
-                document.getElementById("rewardInterval").innerText = interval;
             } catch (error) {
                 showStatus("Info fetch error: " + error.message, true);
                 console.error("Update info error:", error);

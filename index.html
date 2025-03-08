@@ -1244,7 +1244,9 @@
             status.className = isError ? "error" : "success";
         }
 
-        window.addEventListener("load", init);
+        window.addEventListener("load", () => {
+            // Auto-connect can be added here if desired
+        });
     </script>
 </body>
 </html>

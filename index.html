@@ -1173,7 +1173,7 @@
 
                 const chainId = await web3.eth.getChainId();
                 console.log("Detected Chain ID:", chainId);
-                if (Number(chainId) !== 641) {
+                if (Number(chainId) !== 146) {
                     try {
                         await window.ethereum.request({
                             method: "wallet_switchEthereumChain",
@@ -1186,7 +1186,7 @@
                                 params: [{
                                     chainId: "0x281",
                                     chainName: "Sonic",
-                                    rpcUrls: ["https://rpc.sonic.network"],
+                                    rpcUrls: ["https://rpc.soniclabs.com"],
                                     nativeCurrency: { name: "Sonic", symbol: "$S", decimals: 18 },
                                     blockExplorerUrls: ["https://sonicscan.org"]
                                 }]

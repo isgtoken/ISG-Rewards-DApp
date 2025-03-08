@@ -128,6 +128,10 @@
         <p>Interval: <span id="rewardInterval">0</span> secs</p>
 
         <div class="input-group">
+            <button onclick="connectWallet()">Connect Wallet</button>
+        </div>
+
+        <div class="input-group">
             <h2>Stake ISG</h2>
             <input type="number" id="stakeAmount" placeholder="Enter amount" min="0">
             <button onclick="stake()">Stake</button>
@@ -145,7 +149,6 @@
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
     <script>
- 
         const contractAddress = "0x1C58EeD59d86e8bF5db4D3b9F44750818185eea5"; // Replace with your address
         const contractABI = [
 	{
@@ -1148,23 +1151,50 @@
         let contract;
         let account;
 
-        async function init() {
-            if (!window.ethereum) {
-                showStatus("Please install MetaMask!", true);
-                return;
-            }
-            web3 = new Web3(window.ethereum);
+        async function connectWallet() {
             try {
-                await window.ethereum.request({ method: "eth_requestAccounts" });
+                if (window.ethereum) {
+                    // MetaMask or injected provider
+                    web3 = new Web3(window.ethereum);
+                    await window.ethereum.request({ method: "eth_requestAccounts" });
+                } else {
+                    // WalletConnect fallback
+                    const provider = new WalletConnectProvider({
+                        rpc: { 146: "https://rpc.sonic.network" },
+                        chainId: 146
+                    });
+                    await provider.enable();
+                    web3 = new Web3(provider);
+                }
+
                 const accounts = await web3.eth.getAccounts();
                 account = accounts[0];
                 document.getElementById("account").innerText = account.slice(0, 6) + "..." + account.slice(-4);
 
                 const chainId = await web3.eth.getChainId();
                 console.log("Detected Chain ID:", chainId);
-                if (Number(chainId) !== 146) {
-                    showStatus("Switch to Sonic network! Detected: " + chainId, true);
-                    return;
+                if (Number(chainId) !== 641) {
+                    try {
+                        await window.ethereum.request({
+                            method: "wallet_switchEthereumChain",
+                            params: [{ chainId: "0x281" }],
+                        });
+                    } catch (switchError) {
+                        if (switchError.code === 4902) {
+                            await window.ethereum.request({
+                                method: "wallet_addEthereumChain",
+                                params: [{
+                                    chainId: "0x281",
+                                    chainName: "Sonic",
+                                    rpcUrls: ["https://rpc.sonic.network"],
+                                    nativeCurrency: { name: "Sonic", symbol: "$S", decimals: 18 },
+                                    blockExplorerUrls: ["https://sonicscan.org"]
+                                }]
+                            });
+                        } else {
+                            throw switchError;
+                        }
+                    }
                 }
 
                 contract = new web3.eth.Contract(contractABI, contractAddress);
@@ -1172,7 +1202,7 @@
                 updateInfo();
             } catch (error) {
                 showStatus("Connection error: " + error.message, true);
-                console.error("Init error:", error);
+                console.error("Connect error:", error);
             }
         }
 
@@ -1190,9 +1220,34 @@
                 const totalRewards = await contract.methods.rewardPool().call();
                 document.getElementById("totalRewards").innerText = web3.utils.fromWei(totalRewards, "ether");
 
+                const interval = await contract.methods.rewardInterval().call();
+                document.getElementById("rewardInterval").innerText = interval;
             } catch (error) {
                 showStatus("Info fetch error: " + error.message, true);
                 console.error("Update info error:", error);
+            }
+        }
+
+        async function stake() {
+            const amount = document.getElementById("stakeAmount").value;
+            if (!amount || amount <= 0) {
+                showStatus("Enter a valid amount!", true);
+                return;
+            }
+            const weiAmount = web3.utils.toWei(amount, "ether");
+            try {
+                showStatus("Approving ISG...");
+                await contract.methods.approve(contractAddress, weiAmount).send({ from: account });
+                showStatus("Staking...");
+                await contract.methods.stake(weiAmount).send({ from: account })
+                    .on("transactionHash", (hash) => showStatus(`Staking TX: ${hash.slice(0, 10)}...`))
+                    .on("receipt", () => {
+                        showStatus("Stake successful!", false);
+                        updateInfo();
+                    });
+            } catch (error) {
+                showStatus("Stake failed: " + error.message, true);
+                console.error("Stake error:", error);
             }
         }
 
